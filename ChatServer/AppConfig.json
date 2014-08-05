@@ -1,0 +1,11 @@
+{
+    "AdminPassword": "password",
+    "LICENSE_KEY": "",
+    "LogLevel": "WARN",
+    "FlashPolicyPort": 8430,
+    "AdminUsername": "admin",
+    "MasterHost": "127.0.0.1",
+    "TickTime": 500,
+    "HSQLDBFile": "HSQLDBFile",
+    "ListenPort": 12346
+}

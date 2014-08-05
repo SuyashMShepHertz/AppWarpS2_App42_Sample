@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Chat</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="bootstrap.min.css">
+        <script src="jquery-1.10.2.min.js"></script>
+        <script src="bootstrap.min.js"></script>
+        <script src="appwarp.min.js"></script>
+		<script src="App42-all-2.6.min.js"></script>
+        <script type="text/javascript">
+            var AppWarpAPIKey = "";
+			var App42APIKey = "";
+			var App42SecretKey = "";
+			
+            var _warpclient;
+            var nameId = "";
+            var roomsText = "";
+            var inRoom = false;
+            var inLobby = false;
+            var roomId = "";
+            
+            function onConnectDone(res)
+            {
+                if(res == AppWarp.ResultCode.Success)
+                {
+                    $("#roomInfo").html("Joining Lobby...");
+                    _warpclient.joinLobby();
+                }
+				else if(res == 1) // Auth Pending
+				{
+					alert("Invalide UserName/Password");
+				}
+                else
+                {
+                    $("#roomInfo").html("Error in Connection");
+                }
+				console.log("onConnectDone : "+res);
+            }
+            
+            function onGetAllRoomsDone(rooms)
+            {
+                roomsText = "";
+                $("#roomsList").html(roomsText);
+                for(var i=0; i<rooms.getRoomIds().length; ++i)
+                {
+                    _warpclient.getLiveRoomInfo(rooms.getRoomIds()[i]);
+                }
+                
+            }
+
+            function onJoinLobbyDone(lobby)
+            {
+                if(lobby.getResult() == 0)
+                {
+                    $("#roomInfo").html("Joined Lobby");
+                    inLobby = true;
+                    _warpclient.getAllRooms();
+                }
+                else
+                {
+                    $("#roomInfo").html("Error joining lobby");
+                }
+            }
+            
+            function onGetLiveRoomInfo(room)
+            {
+                roomsText += '<li><a href="#" onClick="joinRoom(\''+room.getRoom().getRoomId()+'\')">' + room.getRoom().getName() + '</a></li>';
+                $("#roomsList").html(roomsText);
+            }
+            
+            function onJoinRoomDone(room)
+            {
+                if(room.getResult() == AppWarp.ResultCode.Success)
+                {
+                    inRoom = true;
+                    roomId = room.getRoomId();
+                    $("#roomInfo").html("Joined Room : " + room.getName());
+                    $("#chat").html("");
+                    $("#roomsList").html('<button id="leaveBtn" onClick="leaveRoom()" type="button" class="btn btn-primary">Leave Room</button>');
+                }
+                else
+                {
+                    $("#roomInfo").html("Error joining room");
+                }
+            }
+            
+            function onLeaveRoomDone(room)
+            {
+                if(room.getResult() == AppWarp.ResultCode.Success)
+                {
+                    inRoom = false;
+                    _warpclient.getAllRooms();
+                    $("#chat").html("");
+                    _warpclient.joinLobby();
+                }
+            }
+
+            function onLeaveLobbyDone(lobby)
+            {
+                if(lobby.getResult() == AppWarp.ResultCode.Success)
+                {
+                    inLobby = false;
+                    $("#roomInfo").html("Joining room");
+                    _warpclient.joinRoom(roomId);
+                }
+            }
+            
+            function onChatReceived(chat)
+            {
+                $("#chat").html("<dt class='text-danger'>"+chat.getSender() + "</dt><dd class='text-primary'>" + chat.getChat() + "</dd>" + $("#chat").html());
+            }
+            
+            function joinRoom(id)
+            {
+                if(inLobby == true)
+                {
+                    _warpclient.leaveLobby();
+                    roomId = id;
+                }
+                else
+                {
+                    $("#roomInfo").html("Joining room");
+                    _warpclient.joinRoom(roomId);
+                }
+            }
+            
+            function leaveRoom()
+            {
+                _warpclient.leaveRoom(roomId);
+                $("#roomInfo").html("Connected");
+            }
+            
+            $(document).ready(function(){
+				App42.initialize(App42APIKey, App42SecretKey);
+			
+                $("#roomsRow").hide();
+                $("#nameBtn").click(function(){
+                    
+					nameId = $("#nameText").val();
+					var pass = $("#passText").val();
+					
+					if(nameId.trim() != "" && pass.trim() != "")
+					{
+						$("#nameRow").hide();
+						$("#roomsRow").show();
+									
+						$("#roomInfo").html("Connecting...");
+						AppWarp.WarpClient.initialize(AppWarpAPIKey, "localhost");
+						_warpclient = AppWarp.WarpClient.getInstance();
+						_warpclient.setResponseListener(AppWarp.Events.onConnectDone, onConnectDone);
+						_warpclient.setResponseListener(AppWarp.Events.onGetAllRoomsDone, onGetAllRoomsDone);
+						_warpclient.setResponseListener(AppWarp.Events.onGetLiveRoomInfoDone, onGetLiveRoomInfo);
+						_warpclient.setResponseListener(AppWarp.Events.onJoinRoomDone, onJoinRoomDone);
+						_warpclient.setResponseListener(AppWarp.Events.onLeaveRoomDone, onLeaveRoomDone);
+                        _warpclient.setResponseListener(AppWarp.Events.onJoinLobbyDone, onJoinLobbyDone);
+                        _warpclient.setResponseListener(AppWarp.Events.onLeaveLobbyDone, onLeaveLobbyDone);
+						_warpclient.setNotifyListener(AppWarp.Events.onChatReceived, onChatReceived);
+						_warpclient.connect(nameId,pass);
+					}
+                });
+				
+				$("#registerBtn").click(function(){
+					var user = $("#nameText").val();
+					var pass = $("#passText").val();
+					
+					if(user.trim() === "" || pass.trim() === ""){
+						alert("Error : Please provide both UserName and Password");
+					}else{
+						var userService = new App42User();
+						userService.createUser(user, pass, user, {
+							success: function(object){
+								alert("Success : User created");
+							},
+							error: function(error){
+								var err = JSON.parse(error);
+								alert("Error : "+err.app42Fault.details);
+							}
+						});
+					}
+				});
+				
+				$("#chatBtn").click(function(){
+                    if(inRoom == true || inLobby == true)
+                    {
+                        if($("#chatText").val() != "")
+                        {
+                            _warpclient.sendChat($("#chatText").val());
+                            $("#chatText").val("");
+                        }
+                    }
+                });
+            });
+        </script>
+        <style>
+            #chat dd{
+                padding-bottom: 2px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="row" id="nameRow">
+              <div class="col-md-4 col-md-offset-4 text-center">
+                  <h1>The Chat App</h1>
+                  <h3>Powered by AppWarp</h3>
+                  <div class="well">
+					<form role="form">
+					  <div class="form-group">
+						<label for="nameText">Your Name</label>
+						<input type="text" class="form-control" id="nameText" placeholder="User Name"><br/>
+						<label for="passText">Password</label>
+						<input type="password" class="form-control" id="passText" placeholder="Password"><br/>
+						<button id="nameBtn" type="button" class="btn btn-primary">Login</button>
+						<button id="registerBtn" type="button" class="btn btn-primary">Register</button>
+					  </div>
+                    </form>
+                  </div>
+              </div>
+            </div>
+            <div class="row" id="roomsRow">
+                    <div class="col-md-2 well">
+                        <h4>Rooms</h4>
+                        <ul class="nav nav-pills nav-stacked" id="roomsList">
+                        </ul>
+                    </div>
+                    <div class="col-md-10">
+                        <div class="alert alert-info" id="roomInfo">
+                            No room selected
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="panel panel-default">
+                                  <div class="panel-heading">
+                                      <div class="row">
+                                          <div class="col-md-11">
+                                            <input type="text" class="form-control" id="chatText" placeholder="type here...">
+                                          </div>
+                                          <div class="col-md-1">
+                                            <button id="chatBtn" type="button" class="btn btn-primary">Send</button>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  <div class="panel-body">
+                                      <dl id="chat">
+                                          
+                                      </dl>
+                                  </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+    </body>
+</html>

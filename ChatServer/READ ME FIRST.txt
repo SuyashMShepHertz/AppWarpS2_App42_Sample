@@ -1,0 +1,1 @@
+To run this sample, you need to copy all the libs required for AppWarp S2 into libs folder along with App42's Java Lib.
